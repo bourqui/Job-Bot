@@ -27,7 +27,7 @@ def _read_csv_via_httpx(url: str) -> pd.DataFrame:
 def _read_df_with_gspread(sheet_id: str, gid: int) -> pd.DataFrame:
     if not HAS_GSPREAD:
         raise RuntimeError("gspread not installed. `pip install gspread google-auth`")
-    gc = gspread.service_account(filename="service_account.json")
+    gc = gspread.service_account(filename="service_account_jobbot.json")
     sh = gc.open_by_key(sheet_id)
     ws = next((ws for ws in sh.worksheets() if ws.id == gid), None)
     if ws is None:
