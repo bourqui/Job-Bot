@@ -26,29 +26,22 @@ SHEET_ID_MAIN = "1-bG7_sqsq83OSnMOatR9CEue0pnEVEePgq5Lyctn0FI"
 GID_SEARCH_TERMS = "806664812"  # "search_terms for API"
 GID_JOBS = "0"                  # "Jobs" (has "Adzuna ID")
 
-# ------------------------------
-# Function: read_search_terms
-# - Pulls the search_terms tab as a DataFrame
-# - Keeps only the columns you care about (what_phrase, title_only)
-# - Drops empty rows
-# - Returns it as a list of dicts, e.g.:
-#   [{"what_phrase": "data engineer", "title_only": ""}, ...]
-# ------------------------------
+def _read_csv_via_httpx(url: str) -> pd.DataFrame:
+    # httpx uses certifi cert bundle; avoids macOS urllib cert issues
+    with httpx.Client(timeout=20) as client:
+        r = client.get(url)
+        r.raise_for_status()
+        return pd.read_csv(io.StringIO(r.text))
+
 def read_search_terms() -> List[dict]:
     url = csv_export_url(SHEET_ID_MAIN, GID_SEARCH_TERMS)
-    df = pd.read_csv(url)
+    df = _read_csv_via_httpx(url)
     needed = [c for c in ["what_phrase", "title_only"] if c in df.columns]
     return df[needed].dropna(how="all").to_dict(orient="records")
 
-# ------------------------------
-# Function: read_processed_adzuna_ids
-# - Pulls the Jobs tab
-# - Looks for a column called "Adzuna ID"
-# - Returns a Python set of IDs (fast to check membership later, e.g. if job_id in processed_ids)
-# ------------------------------
 def read_processed_adzuna_ids() -> Set[str]:
     url = csv_export_url(SHEET_ID_MAIN, GID_JOBS)
-    df = pd.read_csv(url)
+    df = _read_csv_via_httpx(url)
     col = "Adzuna ID"
     if col not in df.columns:
         return set()
