@@ -36,5 +36,17 @@ def terms_preview():
     terms = read_search_terms()
     print(json.dumps(terms[:5], indent=2))
 
+@app.command()
+def sheets-debug():
+    """
+    List worksheet titles and IDs via gspread to verify private access.
+    """
+    import gspread
+    from jobs.io.sheets import SHEET_ID_MAIN
+    gc = gspread.service_account(filename="service_account_jobbot.json")
+    sh = gc.open_by_key(SHEET_ID_MAIN)
+    for ws in sh.worksheets():
+        print(f"{ws.title}  gid={ws.id}")
+
 if __name__ == "__main__":
     app()
