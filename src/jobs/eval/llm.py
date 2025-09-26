@@ -31,7 +31,7 @@ def _build_user_prompt(job: Dict) -> str:
         "job_under_evaluation": job,
         "output_spec": {
             "fit_score": "integer 0-10 (10 = strong potential fit)",
-            "fit_notes": "string <=160 chars; brief rationale",
+            "fit_notes": "string <=250 chars; brief rationale",
             "company_summary": "string <=100 chars; brief company + rough size/round if known",
             "job_summary": "string ~200-250 chars; summarize responsibilities & scope (no titles repeated)",
         },
@@ -73,7 +73,7 @@ def evaluate_jobs_simple(jobs: List[Dict]) -> List[Dict]:
 
         # Extract with sane defaults + caps
         fit_score = int(data.get("fit_score", 0)) if isinstance(data.get("fit_score"), (int, str)) else 0
-        fit_notes = str(data.get("fit_notes", "")).strip()[:200]
+        fit_notes = str(data.get("fit_notes", "")).strip()[:260]
         company_summary = str(data.get("company_summary", "")).strip()[:100]
         job_summary = str(data.get("job_summary", "")).strip()[:260]
 

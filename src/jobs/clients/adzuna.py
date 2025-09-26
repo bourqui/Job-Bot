@@ -91,6 +91,11 @@ def adzuna_search(
         "app_key": app_key,
         "what": query,
         "results_per_page": str(results_per_page),
+        "where": "94110",
+        "distance": 50,
+        "max_days_old": 7,
+        "sort_by": "date",
+        "salary_min": 150000,
     }
     if where:
         params["where"] = where
