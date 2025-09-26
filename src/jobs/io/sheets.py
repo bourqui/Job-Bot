@@ -18,6 +18,25 @@ def csv_export_url(sheet_id: str, gid: str | int) -> str:
 SHEET_ID_MAIN = "1-bG7_sqsq83OSnMOatR9CEue0pnEVEePgq5Lyctn0FI"
 GID_SEARCH_TERMS = 806664812  # ints are nicer when using gspread (worksheet.id)
 GID_JOBS = 0
+GID_CONTACTS = 1909164653
+
+def read_contacts() -> list[dict]:
+    """
+    Return rows from your Contacts tab as list[dict].
+    Expected headers include at least: 'Company', 'Concatenated Name', 'Position', 'URL'
+    """
+    # If you know the gid, use _read_tab(SHEET_ID_MAIN, GID_CONTACTS)
+    # Otherwise use gspread by title (safer when columns move):
+    if not HAS_GSPREAD:
+        raise RuntimeError("gspread is required to read Contacts tab privately.")
+    gc = gspread.service_account(filename="service_account_jobbot.json")
+    sh = gc.open_by_key(SHEET_ID_MAIN)
+    ws = next((w for w in sh.worksheets() if w.title.strip().lower() == "linkedin contact export"), None)
+    if ws is None:
+        raise ValueError("No worksheet titled 'Contacts'.")
+    rows = ws.get_all_records()  # list[dict]
+    return rows
+
 
 def _read_csv_via_httpx(url: str) -> pd.DataFrame:
     with httpx.Client(timeout=20) as client:

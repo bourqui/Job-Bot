@@ -16,11 +16,17 @@ import os
 import typer
 import datetime as dt
 
+from rapidfuzz import process, fuzz
 from datetime import date
 from jobs.clients.adzuna import adzuna_search
 from jobs.pipeline.normalize import normalize_adzuna
 from jobs.pipeline.filter import filter_new
-from jobs.io.sheets import read_search_terms, read_processed_adzuna_ids, append_jobs_rows
+from jobs.io.sheets import (
+    read_search_terms,
+    read_processed_adzuna_ids,
+    append_jobs_rows,
+    read_contacts,
+)
 
 today = dt.date.today().isoformat()  # e.g. "2025-09-26"
 
@@ -44,7 +50,8 @@ def new_from_adzuna(
     score: bool = typer.Option(False, "--score", help="Use OpenAI to score jobs (needs OPENAI_API_KEY)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print rows but do not write to Sheets"),
     debug_ids: bool = typer.Option(False, "--debug-ids", help="Print fetched and already-seen IDs"),
-    debug_llm: bool = typer.Option(False, "--debug-llm", help="Print LLM eval outputs and keys")
+    contact_threshold: int = typer.Option(90, "--contact-threshold", help="Fuzzy match threshold 0-100"),
+    debug_contacts: bool = typer.Option(False, "--debug-contacts", help="Show contact matches"),
 ):
     """
     Fetch Adzuna → normalize → filter out already-processed IDs → (optional) score → append to 'Jobs' sheet.
@@ -63,6 +70,13 @@ def new_from_adzuna(
     jobs = normalize_adzuna(raw)  # list[dict] with keys: id,title,company,location,url,salary_min,salary_max,source
 
     typer.echo(f"Fetched {len(jobs)} jobs.")
+
+    # Load contacts once
+    contacts = []
+    try:
+        contacts = read_contacts()
+    except Exception as e:
+        typer.echo(f"Contacts not available ({e}); continuing without connections.", err=True)
 
     # --- filter already processed ---
     processed = read_processed_adzuna_ids()  # set[str] from your 'Jobs' sheet ("Adzuna ID" column)
@@ -116,10 +130,27 @@ def new_from_adzuna(
             evals = evaluate_jobs_simple(fresh)
             eval_by_id = {e["id"]: e for e in evals}
 
-    # --- build rows (keys must match sheet headers) ---
+    # --- build rows ---
     rows = []
     for j in fresh:
-        e = eval_by_id.get(j.get("id"), {})
+        e = eval_by_id.get(str(j.get("id", "")), {})
+
+        # fuzzy match company -> contact
+        contact_str = ""
+        if contacts:
+            match = find_best_contact(j.get("company", ""), contacts, score_cutoff=contact_threshold)
+            if match:
+                nm = str(match.get("Concatenated Name", "")).strip()
+                pos = str(match.get("Position", "")).strip()
+                co  = str(match.get("Company", "")).strip()
+                url = str(match.get("URL", "")).strip()
+                # Nice short string; include link if present
+                contact_str = f"{nm} — {pos} at {co}"
+                if url:
+                    contact_str += f" ({url})"
+                if debug_contacts:
+                    typer.echo(f"[contacts] '{j.get('company','')}' -> '{co}' score={match.get('_match_score')} [{nm}]")
+
         rows.append({
             "Adzuna ID": j.get("id", ""),
             "Company": j.get("company", ""),
@@ -128,17 +159,14 @@ def new_from_adzuna(
             "JD summary": e.get("job_summary", "") if score else "",
             "City": j.get("location", ""),
             "URL": j.get("url", ""),
-            # include these only if your sheet has these columns in the header row:
+            "Connection": contact_str,
             "Salary Min": j.get("salary_min", ""),
             "Salary Max": j.get("salary_max", ""),
-            # no "Source" column anymore
             "AI score": e.get("fit_score", "") if score else "",
             "AI notes": e.get("fit_notes", "") if score else "",
-            
             "Salary Estimated": j.get("salary_estimated", ""),
             "Posting created": j.get("created", ""),
             "Date pulled": today,
-
         })
 
     # --- write or preview ---
@@ -228,6 +256,54 @@ def llm_test():
     }
     res = evaluate_jobs_simple([fake_job])
     print(res)
+
+# simple normalizer to improve matching
+def _clean_co(s: str) -> str:
+    if not s:
+        return ""
+    s = s.lower().strip()
+    # strip common company suffixes
+    for suf in (" inc.", " inc", ", inc", " llc", ", llc", " ltd.", " ltd", " corp.", " corp", " corporation", " company", " co.", " co"):
+        if s.endswith(suf):
+            s = s[: -len(suf)].strip()
+    return s
+
+def find_best_contact(job_company: str, contacts: list[dict], score_cutoff: int = 90) -> dict | None:
+    """
+    Return the best matching contact row or None.
+    Uses RapidFuzz to match job_company to contacts' company names.
+    """
+    cand = _clean_co(job_company)
+    if not cand or not contacts:
+        return None
+
+    # Build the search index: (display_string, payload) list
+    choices = []
+    for c in contacts:
+        co = _clean_co(str(c.get("Company", "")))
+        if co:
+            # Keep original row as payload so we can return it
+            choices.append((co, c))
+
+    if not choices:
+        return None
+
+    # Find best match
+    # process.extractOne returns (choice, score, idx)
+    best = process.extractOne(
+        cand,
+        choices,
+        scorer=fuzz.WRatio,
+        score_cutoff=score_cutoff
+    )
+    if not best:
+        return None
+
+    # best[0] is the matched string; best[1] is score; best[2] is index
+    _, score, idx = best
+    row = choices[idx][1]
+    row["_match_score"] = score
+    return row
 
 if __name__ == "__main__":
     app()
