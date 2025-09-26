@@ -14,6 +14,7 @@ load_dotenv(override=True)  # automatically looks for a .env file in the project
 import json
 import os
 import typer
+import datetime as dt
 
 from datetime import date
 from jobs.clients.adzuna import adzuna_search
@@ -42,6 +43,7 @@ def new_from_adzuna(
     limit: int = 50,
     score: bool = typer.Option(False, "--score", help="Use OpenAI to score jobs (needs OPENAI_API_KEY)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print rows but do not write to Sheets"),
+    debug_ids: bool = typer.Option(False, "--debug-ids", help="Print fetched and already-seen IDs"),
 ):
     """
     Fetch Adzuna → normalize → filter out already-processed IDs → (optional) score → append to 'Jobs' sheet.
@@ -60,6 +62,17 @@ def new_from_adzuna(
     # --- filter already processed ---
     processed = read_processed_adzuna_ids()  # set[str] from your 'Jobs' sheet ("Adzuna ID" column)
     fresh = filter_new(jobs, processed)
+
+    if debug_ids: # used to debug the ids/ show how many are already in the sheet
+        fetched_ids = [str(j.get("id", "")) for j in jobs]
+        fresh_ids = [str(j.get("id", "")) for j in fresh]
+        already = sorted(set(fetched_ids) & processed)
+        typer.echo(json.dumps({
+            "processed_count": len(processed),
+            "fetched_ids": fetched_ids,
+            "fresh_ids": fresh_ids,
+            "already_in_sheet": already[:50],  # cap for sanity
+        }, indent=2))
 
     # --- optional LLM scoring ---
     eval_by_id = {}
