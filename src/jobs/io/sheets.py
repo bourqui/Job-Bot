@@ -4,6 +4,7 @@ import io
 import httpx
 import pandas as pd
 from typing import List, Set
+import datetime as dt
 
 try:
     import gspread
@@ -56,3 +57,50 @@ def read_processed_adzuna_ids() -> Set[str]:
     if col not in df.columns:
         return set()
     return set(df[col].dropna().astype(str).tolist())
+
+def append_jobs_rows(rows: list[dict]) -> int:
+    """
+    Append a list of dicts to the 'Jobs' worksheet.
+    - Dict keys must match the sheet's header row exactly.
+    - Raises if worksheet 'Jobs' is missing or required headers are missing.
+    - Returns number of rows appended.
+    """
+    if not rows:
+        return 0
+    if not HAS_GSPREAD:
+        raise RuntimeError("gspread not installed. `pip install gspread google-auth`")
+
+    # 1) Open spreadsheet & the *exact* worksheet title (no fallback).
+    gc = gspread.service_account(filename="service_account_jobbot.json")
+    sh = gc.open_by_key(SHEET_ID_MAIN)
+    try:
+        ws = sh.worksheet("Jobs")  # <-- exact title; will raise if not found
+    except gspread.WorksheetNotFound as e:
+        raise RuntimeError("Worksheet 'Jobs' not found. Fix the tab name or code.") from e
+
+    # 2) Read header row and validate expected columns exist.
+    headers = ws.row_values(1)  # first row as list of header strings
+    if not headers:
+        raise RuntimeError("Header row is empty in 'Jobs' worksheet.")
+
+    # Minimal required columns (change if your sheet differs).
+    required = {"Adzuna ID", "Title", "Company", "Location", "URL", "Source"}
+    missing = sorted(required - set(headers))
+    if missing:
+        raise RuntimeError(f"'Jobs' is missing required header(s): {', '.join(missing)}")
+
+    header_index = {h: i for i, h in enumerate(headers)}  # 0-based
+
+    # 3) Normalize incoming dicts to header order; auto-fill Added At if present.
+    out = []
+    now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    has_added_at = "Added At" in header_index
+    for r in rows:
+        if has_added_at and "Added At" not in r:
+            r = {**r, "Added At": now}
+        out.append([r.get(h, "") for h in headers])
+
+    # 4) Append at the bottom. This does NOT overwrite existing rows.
+    #    value_input_option="RAW" keeps values as-is; use "USER_ENTERED" if you want Sheets to parse.
+    ws.append_rows(out, value_input_option="RAW")
+    return len(out)
