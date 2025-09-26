@@ -55,16 +55,21 @@ def new_from_adzuna(
     app_key = os.getenv("ADZUNA_APP_KEY", "")
     if not app_id or not app_key:
         raise SystemExit("Set ADZUNA_APP_ID and ADZUNA_APP_KEY env vars (in .env).")
+    
+    typer.echo(f"Fetching up to {limit} jobs from Adzuna for query: {query!r}...")
 
     # --- fetch & normalize ---
     raw = adzuna_search(app_id, app_key, query, results_per_page=limit)
     jobs = normalize_adzuna(raw)  # list[dict] with keys: id,title,company,location,url,salary_min,salary_max,source
+
+    typer.echo(f"Fetched {len(jobs)} jobs.")
 
     # --- filter already processed ---
     processed = read_processed_adzuna_ids()  # set[str] from your 'Jobs' sheet ("Adzuna ID" column)
     fresh = filter_new(jobs, processed)
     evals = []
     eval_by_id = {}
+    typer.echo(f"{len(fresh)} new jobs after filtering out {len(processed)} already processed.")
 
     if debug_llm and fresh:
         first_id = str(fresh[0].get("id",""))
@@ -83,6 +88,7 @@ def new_from_adzuna(
 
     # optional LLM scoring
     if score and fresh:
+        typer.echo(f"Scoring {len(fresh)} jobs with LLM...")
         try:
             evals = evaluate_jobs_simple(fresh)  # returns list of {"id", "fit_score", "fit_notes"}
             eval_by_id = {str(e["id"]): e for e in evals}
