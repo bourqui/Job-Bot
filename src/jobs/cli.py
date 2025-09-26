@@ -37,7 +37,7 @@ def terms_preview():
     print(json.dumps(terms[:5], indent=2))
 
 @app.command()
-def sheets-debug():
+def sheets_debug():
     """
     List worksheet titles and IDs via gspread to verify private access.
     """
