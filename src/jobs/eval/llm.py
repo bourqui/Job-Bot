@@ -16,7 +16,7 @@ with PROFILE_PATH.open() as f:
 SYSTEM_MSG = """You are a concise recruiting-assistant bot helping evaluate job fit.
 Return ONLY valid JSON with keys: 
 - fit_score (0-10 integer)
-- fit_notes (<=160 chars)
+- fit_notes (<=320 chars; provide more detail than one sentence)
 - company_summary (<=100 chars)
 - job_summary (≈200-250 chars)
 No extra text—JSON only.
@@ -31,7 +31,7 @@ def _build_user_prompt(job: Dict) -> str:
         "job_under_evaluation": job,
         "output_spec": {
             "fit_score": "integer 0-10 (10 = strong potential fit)",
-            "fit_notes": "string <=250 chars; brief rationale",
+            "fit_notes": "string <=320 chars; 2–3 sentences explaining rationale",
             "company_summary": "string <=100 chars; brief company + rough size/round if known",
             "job_summary": "string ~200-250 chars; summarize responsibilities & scope (no titles repeated)",
         },
@@ -73,7 +73,7 @@ def evaluate_jobs_simple(jobs: List[Dict]) -> List[Dict]:
 
         # Extract with sane defaults + caps
         fit_score = int(data.get("fit_score", 0)) if isinstance(data.get("fit_score"), (int, str)) else 0
-        fit_notes = str(data.get("fit_notes", "")).strip()[:260]
+        fit_notes = str(data.get("fit_notes", "")).strip()[:350]
         company_summary = str(data.get("company_summary", "")).strip()[:100]
         job_summary = str(data.get("job_summary", "")).strip()[:260]
 
