@@ -84,7 +84,7 @@ def append_jobs_rows(rows: list[dict]) -> int:
         raise RuntimeError("Header row is empty in 'Jobs' worksheet.")
 
     # Minimal required columns (change if your sheet differs).
-    required = {"Adzuna ID", "Title", "Company", "Location", "URL", "Source"}
+    required = {"Adzuna ID", "Job title", "Company", "City", "URL"}
     missing = sorted(required - set(headers))
     if missing:
         raise RuntimeError(f"'Jobs' is missing required header(s): {', '.join(missing)}")

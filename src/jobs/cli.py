@@ -15,41 +15,99 @@ import json
 import os
 import typer
 
+from datetime import date
 from jobs.clients.adzuna import adzuna_search
 from jobs.pipeline.normalize import normalize_adzuna
 from jobs.pipeline.filter import filter_new
-from jobs.io.sheets import read_search_terms, read_processed_adzuna_ids
+from jobs.io.sheets import read_search_terms, read_processed_adzuna_ids, append_jobs_rows
+
+today = dt.date.today().isoformat()  # e.g. "2025-09-26"
+
+# Optional evaluator (safe import)
+try:
+    from jobs.eval.llm import evaluate_jobs_simple
+    HAS_EVAL = True
+except Exception:
+    HAS_EVAL = False
+
+
 
 # Typer app instance for CLI commands
 app = typer.Typer(help="Job fetcher")
 
 @app.command()
-def new_from_adzuna(query: str, limit: int = 50):
+@app.command()
+def new_from_adzuna(
+    query: str,
+    limit: int = 50,
+    score: bool = typer.Option(False, "--score", help="Use OpenAI to score jobs (needs OPENAI_API_KEY)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print rows but do not write to Sheets"),
+):
     """
-    Fetch Adzuna → normalize → filter out already-processed IDs → print JSON.
-    
-    This is the main workflow: get fresh job postings that haven't been processed yet.
+    Fetch Adzuna → normalize → filter out already-processed IDs → (optional) score → append to 'Jobs' sheet.
+    No 'Source' column is written.
     """
-    # Get Adzuna API credentials from environment variables
+    # --- creds ---
     app_id = os.getenv("ADZUNA_APP_ID", "")
     app_key = os.getenv("ADZUNA_APP_KEY", "")
     if not app_id or not app_key:
-        raise SystemExit("Set ADZUNA_APP_ID and ADZUNA_APP_KEY env vars.")
+        raise SystemExit("Set ADZUNA_APP_ID and ADZUNA_APP_KEY env vars (in .env).")
 
-    # Step 1: Fetch raw job data from Adzuna API
+    # --- fetch & normalize ---
     raw = adzuna_search(app_id, app_key, query, results_per_page=limit)
-    
-    # Step 2: Convert Adzuna's raw JSON into our standardized JobRaw models
-    jobs = normalize_adzuna(raw)
-    
-    # Step 3: Get list of job IDs we've already processed (from Google Sheets)
-    processed = read_processed_adzuna_ids()
-    
-    # Step 4: Filter out jobs we've already seen, keep only fresh ones
+    jobs = normalize_adzuna(raw)  # list[dict] with keys: id,title,company,location,url,salary_min,salary_max,source
+
+    # --- filter already processed ---
+    processed = read_processed_adzuna_ids()  # set[str] from your 'Jobs' sheet ("Adzuna ID" column)
     fresh = filter_new(jobs, processed)
 
-    # Step 5: Output results as pretty JSON (temporary - will write to CSV/DB later)
-    print(json.dumps(fresh, indent=2))
+    # --- optional LLM scoring ---
+    eval_by_id = {}
+    if score:
+        if not HAS_EVAL:
+            typer.echo("LLM scoring requested but evaluator not available; skipping.", err=True)
+        else:
+            evals = evaluate_jobs_simple(fresh)
+            eval_by_id = {e["id"]: e for e in evals}
+
+    # --- build rows (keys must match sheet headers) ---
+    rows = []
+    for j in fresh:
+        e = eval_by_id.get(j.get("id"), {})
+        rows.append({
+            "Adzuna ID": j.get("id", ""),
+            "Job title": j.get("title", ""),
+            "Company": j.get("company", ""),
+            "City": j.get("location", ""),
+            "URL": j.get("url", ""),
+            # include these only if your sheet has these columns in the header row:
+            "Salary Min": j.get("salary_min", ""),
+            "Salary Max": j.get("salary_max", ""),
+            # no "Source" column anymore
+            "AI score": e.get("fit_score", "") if score else "",
+            "AI Notes": e.get("fit_notes", "") if score else "",
+            
+            "Salary Estimated": j.get("salary_estimated", ""),
+            "Posting created": j.get("created", ""),
+            "Date pulled": today
+
+        })
+
+    # --- write or preview ---
+    if dry_run:
+        typer.echo(json.dumps({
+            "fetched": len(jobs),
+            "fresh": len(fresh),
+            "preview_rows": rows,
+        }, indent=2))
+        return
+
+    appended = append_jobs_rows(rows)
+    typer.echo(json.dumps({
+        "fetched": len(jobs),
+        "fresh": len(fresh),
+        "appended": appended
+    }, indent=2))
 
 @app.command()
 def terms_preview():
@@ -84,6 +142,23 @@ def sheets_debug():
     # List all worksheets in the spreadsheet
     for ws in sh.worksheets():
         print(f"{ws.title}  gid={ws.id}")
+
+@app.command()
+def jobs_headers():
+    """
+    Debug: show the first row of the 'Jobs' worksheet so we can confirm headers.
+    """
+    import gspread
+    from jobs.io.sheets import SHEET_ID_MAIN, GID_JOBS
+
+    gc = gspread.service_account(filename="service_account_jobbot.json")
+    sh = gc.open_by_key(SHEET_ID_MAIN)
+    ws = next((ws for ws in sh.worksheets() if ws.id == GID_JOBS), None)
+    if ws is None:
+        raise ValueError(f"No worksheet with gid={GID_JOBS}")
+
+    header_row = ws.row_values(1)  # row 1 as a list of strings
+    print("Headers in Jobs tab:", header_row)
 
 if __name__ == "__main__":
     app()
