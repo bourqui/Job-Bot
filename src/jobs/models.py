@@ -1,22 +1,23 @@
 # src/jobs/models.py
 """
-Pydantic models used to represent job records as they come from external sources
-(e.g., APIs like Adzuna) before any transformation/normalization.
+Lightweight typed dictionaries to represent job records as they come from
+external sources (e.g., APIs like Adzuna) before any transformation/normalization.
 
-This module defines lightweight data containers with validation.
+Everything is a plain dict with type hints.
 """
-from pydantic import BaseModel, HttpUrl
-from typing import Optional
+
+from typing import Optional, TypedDict
 
 
-class JobRaw(BaseModel):
+class JobRaw(TypedDict, total=False):
     """
     Minimal representation of a job posting as received from a source API.
 
-    Notes
-    - This model is intended for ingestion/IO boundaries. Keep it close to the
-      source payload shape and avoid derived fields.
-    - Validation is provided by Pydantic (e.g., `url` must be a valid URL).
+    Notes:
+    - `TypedDict` provides type hints (what keys exist, and their value types).
+    - At runtime, this is just a dict: {"id": "123", "title": "Data Engineer", ...}.
+    - No validation is enforced (unlike Pydantic). If you want validation later,
+      you could reintroduce Pydantic models.
     """
 
     # Unique identifier provided by the source system (e.g., Adzuna job ID)
@@ -26,19 +27,19 @@ class JobRaw(BaseModel):
     title: str
 
     # Company name if available in the payload
-    company: Optional[str] = None
+    company: Optional[str]
 
     # Canonical job posting URL
-    url: HttpUrl
+    url: str  # plain string, not validated as URL
 
     # Free-text location or region/city if provided
-    location: Optional[str] = None
+    location: Optional[str]
 
-    # Minimum salary (numeric) if present in the source; currency not enforced here
-    salary_min: Optional[float] = None
+    # Minimum salary (numeric) if present in the source
+    salary_min: Optional[float]
 
-    # Maximum salary (numeric) if present in the source; currency not enforced here
-    salary_max: Optional[float] = None
+    # Maximum salary (numeric) if present in the source
+    salary_max: Optional[float]
 
     # Name of the upstream provider/source (e.g., "adzuna")
     source: str
