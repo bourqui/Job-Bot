@@ -7,9 +7,14 @@ This module provides CLI commands to:
 - Preview search terms from Google Sheets
 - Debug Google Sheets connection and worksheet access
 """
+
+from dotenv import load_dotenv
+load_dotenv(override=True)  # automatically looks for a .env file in the project root
+
 import json
 import os
 import typer
+
 from jobs.clients.adzuna import adzuna_search
 from jobs.pipeline.normalize import normalize_adzuna
 from jobs.pipeline.filter import filter_new
@@ -44,7 +49,7 @@ def new_from_adzuna(query: str, limit: int = 50):
     fresh = filter_new(jobs, processed)
 
     # Step 5: Output results as pretty JSON (temporary - will write to CSV/DB later)
-    print(json.dumps([j.model_dump() for j in fresh], indent=2))
+    print(json.dumps(fresh, indent=2))
 
 @app.command()
 def terms_preview():
