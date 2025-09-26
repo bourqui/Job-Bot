@@ -69,7 +69,7 @@ def adzuna_search(
     """
     Fetch ONE page of search results from Adzuna and return the raw JSON (dict).
 
-    Arguments (ELI5):
+    Arguments:
     - app_id/app_key: your Adzuna credentials.
     - query: what to search for, e.g. "data engineer".
     - country: ISO-ish two-letter code Adzuna expects ("us", "gb", etc.).

@@ -44,6 +44,7 @@ def new_from_adzuna(
     score: bool = typer.Option(False, "--score", help="Use OpenAI to score jobs (needs OPENAI_API_KEY)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print rows but do not write to Sheets"),
     debug_ids: bool = typer.Option(False, "--debug-ids", help="Print fetched and already-seen IDs"),
+    debug_llm: bool = typer.Option(False, "--debug-llm", help="Print LLM eval outputs and keys")
 ):
     """
     Fetch Adzuna → normalize → filter out already-processed IDs → (optional) score → append to 'Jobs' sheet.
@@ -62,6 +63,12 @@ def new_from_adzuna(
     # --- filter already processed ---
     processed = read_processed_adzuna_ids()  # set[str] from your 'Jobs' sheet ("Adzuna ID" column)
     fresh = filter_new(jobs, processed)
+    evals = []
+    eval_by_id = {}
+
+    if debug_llm and fresh:
+        first_id = str(fresh[0].get("id",""))
+        print("debug_llm sample:", json.dumps(eval_by_id.get(first_id, {}), indent=2))
 
     if debug_ids: # used to debug the ids/ show how many are already in the sheet
         fetched_ids = [str(j.get("id", "")) for j in jobs]
@@ -73,6 +80,26 @@ def new_from_adzuna(
             "fresh_ids": fresh_ids,
             "already_in_sheet": already[:50],  # cap for sanity
         }, indent=2))
+
+    # optional LLM scoring
+    if score and fresh:
+        try:
+            evals = evaluate_jobs_simple(fresh)  # returns list of {"id", "fit_score", "fit_notes"}
+            eval_by_id = {str(e["id"]): e for e in evals}
+        except Exception as ex:
+            typer.echo(f"LLM eval failed: {ex}", err=True)
+            evals = []
+            eval_by_id = {}
+
+    # safe debug (now eval_by_id is always defined)
+    if debug_llm:
+        import json as _json
+        print("fresh ids:", [str(j.get("id","")) for j in fresh])
+        print("eval_by_id keys:", list(eval_by_id.keys()))
+        print("evals sample:", _json.dumps(evals[:2], indent=2))
+        print("fresh count:", len(fresh))
+        print("evals count:", len(evals))
+        print("eval_by_id keys:", list(eval_by_id.keys())[:10])
 
     # --- optional LLM scoring ---
     eval_by_id = {}
@@ -89,8 +116,10 @@ def new_from_adzuna(
         e = eval_by_id.get(j.get("id"), {})
         rows.append({
             "Adzuna ID": j.get("id", ""),
-            "Job title": j.get("title", ""),
             "Company": j.get("company", ""),
+            "About company": e.get("company_summary", "") if score else "",
+            "Job title": j.get("title", ""),
+            "JD summary": e.get("job_summary", "") if score else "",
             "City": j.get("location", ""),
             "URL": j.get("url", ""),
             # include these only if your sheet has these columns in the header row:
@@ -98,11 +127,11 @@ def new_from_adzuna(
             "Salary Max": j.get("salary_max", ""),
             # no "Source" column anymore
             "AI score": e.get("fit_score", "") if score else "",
-            "AI Notes": e.get("fit_notes", "") if score else "",
+            "AI notes": e.get("fit_notes", "") if score else "",
             
             "Salary Estimated": j.get("salary_estimated", ""),
             "Posting created": j.get("created", ""),
-            "Date pulled": today
+            "Date pulled": today,
 
         })
 
@@ -172,6 +201,27 @@ def jobs_headers():
 
     header_row = ws.row_values(1)  # row 1 as a list of strings
     print("Headers in Jobs tab:", header_row)
+
+@app.command()
+def llm_test():
+    """
+    LLM smoke test: run evaluator on a single fake job (no network, no Sheets).
+    """
+    from jobs.eval.llm import evaluate_jobs_simple
+    fake_job = {
+        "id": "test-123",
+        "title": "Senior Data Engineer",
+        "company": "Fictional Energy Co",
+        "location": "San Francisco, CA",
+        "url": "https://example.com/job/123",
+        "salary_min": 150000,
+        "salary_max": 180000,
+        "salary_estimated": "0",
+        "created": "2025-09-20",
+        # optional: "description": "…" if you decide to pass it through normalize()
+    }
+    res = evaluate_jobs_simple([fake_job])
+    print(res)
 
 if __name__ == "__main__":
     app()
