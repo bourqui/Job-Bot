@@ -51,7 +51,7 @@ This project helps me streamline my job search by fetching job postings, enrichi
 Clone the repo and install dependencies:
 
 ```bash
-git clone https://github.com/<your-username>/job-bot.git
+git clone https://github.com/bourqui/job-bot.git
 cd job-bot
 pip install -r requirements.txt
 ```
@@ -70,15 +70,57 @@ Authenticate Google Sheets with a service account JSON key, saved as service_acc
 
 ## ⚡ Usage
 
-Fetch new jobs:
-```python -m jobs.cli new-from-adzuna "analytics engineer" --limit 20 --score
+**Fetch new jobs:**
+```bash
+python -m jobs.cli new-from-adzuna "analytics engineer" --limit 20 --score
 ```
-Preview without writing to Sheets:
-```python -m jobs.cli new-from-adzuna "data engineer" --limit 5 --score --dry-run
+
+**Preview without writing to Sheets:**
+```bash
+python -m jobs.cli new-from-adzuna "data engineer" --limit 5 --score --dry-run
 ```
-Run a quick AI evaluation test:
-```python -m jobs.cli llm_test
+
+**Run a quick AI evaluation test:**
+```bash
+python -m jobs.cli llm_test
 ```
+
+**Debug Google Sheets connection:**
+```bash
+python -m jobs.cli sheets_debug
+```
+
+---
+
+## 📊 Example Output
+
+When you run the job fetcher, you'll see output like:
+
+```
+Fetching up to 20 jobs from Adzuna for query: 'data engineer'...
+Fetched 20 jobs.
+18 new jobs after filtering out 2 already processed.
+Scoring 18 jobs with OpenAI...
+Writing 18 rows to Google Sheets...
+✅ Successfully added 18 new jobs to spreadsheet
+```
+
+---
+
+## 🔧 Troubleshooting
+
+**"No module named 'jobs'" error:**
+- Make sure you're running from the project root directory
+- Try: `python -m jobs.cli --help`
+
+**"Set ADZUNA_APP_ID and ADZUNA_APP_KEY env vars" error:**
+- Create a `.env` file in the project root with your API credentials
+- Or export them: `export ADZUNA_APP_ID=your_id`
+
+**Google Sheets authentication issues:**
+- Ensure `service_account_jobbot.json` is in the project root
+- Check that the service account has edit access to your spreadsheet
+
 ---
 
 ## 🧠 What I Learned
