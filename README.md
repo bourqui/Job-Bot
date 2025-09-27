@@ -62,6 +62,7 @@ Set up your `.env` with API credentials:
 ADZUNA_APP_ID=your-adzuna-id
 ADZUNA_APP_KEY=your-adzuna-key
 OPENAI_API_KEY=your-openai-key
+```
 
 Authenticate Google Sheets with a service account JSON key, saved as service_account_jobbot.json.
 
@@ -70,32 +71,32 @@ Authenticate Google Sheets with a service account JSON key, saved as service_acc
 ## ⚡ Usage
 
 Fetch new jobs:
-python -m jobs.cli new-from-adzuna "analytics engineer" --limit 20 --score
-
+```python -m jobs.cli new-from-adzuna "analytics engineer" --limit 20 --score
+```
 Preview without writing to Sheets:
-python -m jobs.cli new-from-adzuna "data engineer" --limit 5 --score --dry-run
-
+```python -m jobs.cli new-from-adzuna "data engineer" --limit 5 --score --dry-run
+```
 Run a quick AI evaluation test:
-python -m jobs.cli llm_test
-
+```python -m jobs.cli llm_test
+```
 ---
 
 ## 🧠 What I Learned
 
 This was my first major project building a CLI in Python:
 
-- **Typer** — my first time using it; intuitive and made CLI UX a lot cleaner than argparse.
-- **Migration from n8n** — I originally hacked this together in a no-code tool (n8n), but porting it to Python gave me more control, transparency, and maintainability.
-- **APIs & data pipelines** — learned how to normalize inconsistent API responses, design clean schemas, and connect multiple APIs (Adzuna, OpenAI, Google Sheets).
-- **Error handling** — built in guards for bad JSON from LLMs, missing IDs, and Google Sheets edge cases.
+- **Typer** — my first time using it; intuitive and made CLI UX a lot cleaner and more snazzy
+- **Migration from n8n** — I originally hacked this together in a no-code tool (n8n), but porting it to Python gave me more control, transparency, and maintainability
+- **APIs & data pipelines** — learned how to normalize inconsistent API responses, design clean schemas, and connect multiple APIs (Adzuna, OpenAI, Google Sheets)
+- **Error handling** — built in guards for bad JSON from LLMs, missing IDs, and Google Sheets edge cases
 - **AI-assisted coding** — I leaned heavily on AI tools like Cursor and ChatGPT, but not just for “vibe coding.” I researched trade-offs (e.g. regex vs fuzzy matching, prompt length vs cost, rate limiting strategies) and made deliberate design decisions.
-- **Architectural trade-offs** — simplicity (e.g. sleep-based rate limiting) vs sophistication (full retry logic, parallelization).
+- **Architectural trade-offs** — simplicity (e.g. sleep-based rate limiting) vs sophistication (full retry logic, parallelization)
 
 ---
 
 ## 🔮 Future Improvements
 
-- Support additional job boards (e.g. LinkedIn, Indeed).
+- Support additional job boards (e.g. LinkedIn, Indeed)?
 - Smarter AI prompts for richer summaries.
 - More robust scheduling/automation layer (cron, Airflow, etc.).
-- Expand fuzzy contact matching to include affiliated companies.
+- Expand fuzzy contact matching to include affiliated companies, not just fuzzy matches
