@@ -4,7 +4,7 @@ from typing import Iterable, List, Set, Dict
 def filter_new(jobs: Iterable[Dict], processed_ids: Set[str]) -> List[Dict]:
     """
     Keep only jobs whose 'id' (as a string) is NOT in processed_ids.
-    Jobs are plain dicts.
+    Jobs are plain dictionaries.
     """
     out: List[Dict] = []
     for j in jobs:

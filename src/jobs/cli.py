@@ -43,13 +43,13 @@ except Exception:
 app = typer.Typer(help="Job fetcher")
 
 @app.command()
-@app.command()
 def new_from_adzuna(
     query: str,
     limit: int = 50,
     score: bool = typer.Option(False, "--score", help="Use OpenAI to score jobs (needs OPENAI_API_KEY)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print rows but do not write to Sheets"),
     debug_ids: bool = typer.Option(False, "--debug-ids", help="Print fetched and already-seen IDs"),
+    debug_llm: bool = typer.Option(False, "--debug-llm", help="Print LLM eval outputs"),
     contact_threshold: int = typer.Option(90, "--contact-threshold", help="Fuzzy match threshold 0-100"),
     debug_contacts: bool = typer.Option(False, "--debug-contacts", help="Show contact matches"),
 ):
@@ -67,7 +67,7 @@ def new_from_adzuna(
 
     # --- fetch & normalize ---
     raw = adzuna_search(app_id, app_key, query, results_per_page=limit)
-    jobs = normalize_adzuna(raw)  # list[dict] with keys: id,title,company,location,url,salary_min,salary_max,source
+    jobs = normalize_adzuna(raw)  # list[dict] with standardized job data
 
     typer.echo(f"Fetched {len(jobs)} jobs.")
 
@@ -86,7 +86,7 @@ def new_from_adzuna(
     typer.echo(f"{len(fresh)} new jobs after filtering out {len(processed)} already processed.")
 
     if debug_llm and fresh:
-        first_id = str(fresh[0].get("id",""))
+        first_id = str(fresh[0].get("id", ""))
         print("debug_llm sample:", json.dumps(eval_by_id.get(first_id, {}), indent=2))
 
     if debug_ids: # used to debug the ids/ show how many are already in the sheet
@@ -114,7 +114,7 @@ def new_from_adzuna(
     # safe debug (now eval_by_id is always defined)
     if debug_llm:
         import json as _json
-        print("fresh ids:", [str(j.get("id","")) for j in fresh])
+        print("fresh ids:", [str(j.get("id", "")) for j in fresh])
         print("eval_by_id keys:", list(eval_by_id.keys()))
         print("evals sample:", _json.dumps(evals[:2], indent=2))
         print("fresh count:", len(fresh))
@@ -271,37 +271,35 @@ def _clean_co(s: str) -> str:
 def find_best_contact(job_company: str, contacts: list[dict], score_cutoff: int = 90) -> dict | None:
     """
     Return the best matching contact row or None.
-    Uses RapidFuzz to match job_company to contacts' company names.
+    Matches job_company against contacts' company names using RapidFuzz.
     """
     cand = _clean_co(job_company)
     if not cand or not contacts:
         return None
 
-    # Build the search index: (display_string, payload) list
-    choices = []
+    # Build parallel arrays to avoid putting dicts in RapidFuzz choices
+    names: list[str] = []
+    rows: list[dict] = []
     for c in contacts:
         co = _clean_co(str(c.get("Company", "")))
         if co:
-            # Keep original row as payload so we can return it
-            choices.append((co, c))
+            names.append(co)
+            rows.append(c)
 
-    if not choices:
+    if not names:
         return None
 
-    # Find best match
-    # process.extractOne returns (choice, score, idx)
     best = process.extractOne(
         cand,
-        choices,
+        names,                # only strings here
         scorer=fuzz.WRatio,
         score_cutoff=score_cutoff
     )
     if not best:
         return None
 
-    # best[0] is the matched string; best[1] is score; best[2] is index
-    _, score, idx = best
-    row = choices[idx][1]
+    matched_name, score, idx = best
+    row = rows[idx]
     row["_match_score"] = score
     return row
 
