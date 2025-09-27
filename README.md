@@ -7,7 +7,7 @@ This project helps me streamline my job search by fetching job postings, enrichi
 The result I get is a streamlined spreadsheet where I can see a job and company summary, and an AI score and assessment tailored to my own job experience and interests, with extra notes where I have contacts at the company or organization. This makes job hunting much faster, letting me focus more on what I'm looking for and connections at potential employers, rather than on wading through irrelevant job postings.
 
 <img width="1249" height="369" alt="image" src="https://github.com/user-attachments/assets/b1077d43-6aaa-493f-8ff9-b62885135988" />
-*(NB: Screenshot is with example jobs/employers only! 😌 "Martin Score" is where I add my own personal notes/scoring after reviewing the AI output.)*
+_(NB: Screenshot is with example jobs/employers only! 😌 "Martin Score" is where I add my own personal notes/scoring after reviewing the AI output.)_
 
 I have automated the logging and evaluation of **1,700+** roles with this tool!
 
