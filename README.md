@@ -1,4 +1,4 @@
-# Martin's Friendly CLI Job-Hunter Bot
+# Martin's Friendly CLI Job-Hunter Bot ⚡
 
 Automated job search, scoring, and tracking pipeline built with **Python**, **Typer**, **Adzuna API**, **OpenAI**, and **Google Sheets**.
 
