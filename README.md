@@ -9,6 +9,8 @@ The result I get is a streamlined spreadsheet where I can see a job and company 
 <img width="1249" height="369" alt="image" src="https://github.com/user-attachments/assets/b1077d43-6aaa-493f-8ff9-b62885135988" />
 (Screenshot is with example jobs/employers only! 😌)
 
+I have automated the logging and evaluation of **1,700+** roles with this tool!
+
 ---
 
 ## 🚀 Features
